@@ -1,0 +1,18 @@
+ffmpeg-python==0.2.0
+pyTelegramBotAPI==4.14.0
+requests==2.31.0
+stack-data==0.6.3
+Telethon==1.32.1
+tomlkit==0.12.1
+tornado==6.3.3
+tqdm==4.66.1
+traitlets==5.11.2
+typing_extensions==4.7.1
+tzdata==2023.3
+urllib3==2.0.7
+validate-email==1.3
+wcwidth==0.2.8
+wrapt==1.15.0
+yarl==1.9.2
+youtube-dl==2021.12.17
+-e git+https://github.com/queeemow/pytube_without_age_error.git#egg=pytube
