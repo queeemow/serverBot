@@ -5,103 +5,127 @@ import config
 from utils import Convert, DLYouTube, DLIGReels
 from telebot import types
 
-def program():
-    bot = telebot.TeleBot(BOT_TOKEN) #Передаю объекту токен бота из конфига
-    @bot.message_handler(content_types=["text"])
-    def get_text_messages(message): #Каждый раз при получения нового сообщения срабатывает декоратор - работает асинхронно
+class DownloadBot:
+    BOT = None
+    YT = None
+    IG = None
+    ENJOY = None
+    WHICH_LINK = None
+    CON = None
+    VID_OR_AUD_MARKUP = None
+    RES_MARKUP = None
+    message = None
+
+    def __init__(self) -> None:
+        self.BOT = telebot.TeleBot(BOT_TOKEN) #Передаю объекту токен бота из конфига
+        self.CON = Convert()
+        self.get_text_messages(self.message)
+        pass
+        
+    @BOT.message_handler(content_types=["text"])
+    def get_text_messages(self, message): #Каждый раз при получения нового сообщения срабатывает декоратор - работает асинхронно
         print("message = ", message.text)
-        con = Convert()
-        WHICH_LINK = con.which_link(message) #Проверка корректности ссылки
-        print(WHICH_LINK)
-        match WHICH_LINK:
+
+        self.WHICH_LINK = self.CON.which_link(message) #Проверка корректности ссылки
+        print(self.WHICH_LINK)
+        match self.WHICH_LINK:
             case 1: #Если ссылка правильная то работаем
-                global yt #Чтобы можно было добраться из других функций до экземпляра без класса
-                yt = DLYouTube(str(message.text))
-                markup = types.ReplyKeyboardMarkup(resize_keyboard=True) #кнопки для выбора разрешения видео пользователем
-                # res240 = types.KeyboardButton("240p")
-                res360 = types.KeyboardButton('360p')
-                # res480 = types.KeyboardButton('480p')
-                res720 = types.KeyboardButton('720p') #Кнопки именно такие, так как формат видео позволяет скачать видео со звуком только в 360п или 720п
-                markup.add(res360, res720)
-                bot.send_message(message.chat.id, text="Choose a resolution via menu: ".format(message.from_user), reply_markup=markup)
-                bot.register_next_step_handler(message, choose_YT_resolution) #Бессмысленный мув
-            
+                self.VID_OR_AUD_MARKUP = types.ReplyKeyboardMarkup(resize_keyboard=True) #кнопки для выбора 
+                video = types.KeyboardButton('video')
+                audio = types.KeyboardButton('audio')
+                self.VID_OR_AUD_MARKUP.add(video, audio)
+                self.BOT.send_message(message.chat.id, text="Would you like to get video or audio only?".format(message.from_user), reply_markup=self.VID_OR_AUD_MARKUP)
+                self.YT = DLYouTube(str(message.text))
+                match message.text:
+                    case 'video':
+                        # res240 = types.KeyboardButton("240p")
+                        res360 = types.KeyboardButton('360p')
+                        # res480 = types.KeyboardButton('480p')
+                        res720 = types.KeyboardButton('720p') #Кнопки именно такие, так как формат видео позволяет скачать видео со звуком только в 360п или 720п
+                        self.RES_MARKUP.add(res360, res720)
+                        self.BOT.send_message(message.chat.id, text="Choose a resolution via menu".format(message.from_user), reply_markup=self.RES_MARKUP)
+                        self.BOT.register_next_step_handler(message, self.choose_YT_resolution) #Бессмысленный мув
+                    case 'audio':
+                        'ВСТАВИТЬ МЕТОД ВЫТЯГИВАНИЯ АУДИО'
+                        self.BOT.send_message(message.chat.id, text="PASHOL")
+                    case _:
+                        self.BOT.send_message(message.chat.id, text="Please, use the menu to choose an option")
             case 2:
-                global ig
-                ig = DLIGReels(str(message.text))
-                bot.send_message(message.from_user.id, 'Getting download link, Please stand by...')
-                sendIg(message)
-                print("esdfsfsd", str(message.text))
+                self.IG = DLIGReels(str(message.text))
+                self.BOT.send_message(message.from_user.id, 'Getting download link, Please stand by...')
+                self.sendIg(message)
             case 0: #Если ссылка не на ютюб или инст то нахрен, пусть снова пробует
-                bot.send_message(message.from_user.id, "Send me a link to a YouTube or Instagram video e.g.: https://youtu.be/IUicoBcRiCo?si=l8_zRX8ix8dKy0ai СТЕПА НЕ ЛОХ")
+                self.BOT.send_message(message.from_user.id, "Send me a link to a YouTube or Instagram video e.g.: https://youtu.be/IUicoBcRiCo?si=l8_zRX8ix8dKy0ai СТЕПА НЕ ЛОХ")
+        self.BOT.infinity_polling(timeout=10, long_polling_timeout = 50)
 
+    def choose_YT_resolution(self, message): #Бессмысленный мув
+        self.downloadYT(message) #Бессмысленный мув
 
-    def choose_YT_resolution(message): #Бессмысленный мув
-        downloadYT(message) #Бессмысленный мув
-
-    def downloadYT(message): #Скачать видос
+    def downloadYT(self, message): #Скачать видос
         try:
-            yt.set_res(message.text) #В зависимости от выбранного разрешения весит видос по разному
-            if yt.is_big_filesize():  #Если весит много то надо скачать, разбить и отправить по частям
-                bot.send_message(message.from_user.id, f'The video weights more than 50MB, which is maximum allowed document size limit. The video will be compressed')
-                bot.send_message(message.from_user.id, "Downloading, Please stand by...")
-                yt.download()
-                bot.send_message(message.from_user.id, "Downloading complete, compressing...")
-                yt.compress_video()
-                sendYT(message, True)
+            self.YT.set_res(message.text) #В зависимости от выбранного разрешения весит видос по разному
+            if self.YT.is_big_filesize():  #Если весит много то надо скачать, разбить и отправить по частям
+                self.BOT.send_message(message.from_user.id, f'The video weights more than 50MB, which is maximum allowed document size limit. The video will be compressed')
+                self.BOT.send_message(message.from_user.id, "Downloading, Please stand by...")
+                self.YT.download()
+                self.BOT.send_message(message.from_user.id, "Downloading complete, compressing...")
+                self.YT.compress_video()
+                self.sendYT(message, True)
             else:
-                bot.send_message(message.from_user.id, "Downloading, Please stand by...") #Если весит немного то надо скачать и отправить
-                yt.download()
-                sendYT(message)
+                self.BOT.send_message(message.from_user.id, "Downloading, Please stand by...") #Если весит немного то надо скачать и отправить
+                self.YT.download()
+                self.sendYT(message)
         except Exception as e:
-            bot.send_message(message.from_user.id, "Something went wrong! Try again with the correct download options")
-            get_text_messages(message)
+            self.BOT.send_message(message.from_user.id, "Something went wrong! Try again with the correct download options")
+            self.get_text_messages(message)
             print(str(e))
 
-    def sendYT(message, is_big = False): #Отправить видео
+    def sendYT(self, message, is_big = False): #Отправить видео
         enjoy = True #Если все отправилось хорошо то написать пользователю что все гуд
         if is_big: #Если большой видос, который разбит на маленькие
-            print("______SEND BIG VIDEO_______", yt.compressed_video_name)
-            print("current video =    ", yt.compressed_video_name)
-            f = open(yt.compressed_video_name ,"rb")
+            print("______SEND BIG VIDEO_______", self.YT.compressed_video_name)
+            print("current video =    ", self.YT.compressed_video_name)
+            f = open(self.YT.compressed_video_name ,"rb")
             print("ok - big")
             try:
-                bot.send_document(message.chat.id,f, timeout=200)
-                os.remove(yt.compressed_video_name) #Сразу удаляю маленький видос после отправки
+                self.BOT.send_document(message.chat.id,f, timeout=200)
+                os.remove(self.YT.compressed_video_name) #Сразу удаляю маленький видос после отправки
             except Exception as e:
-                bot.send_message(message.from_user.id, "The video size exceeds 50MB limit, please FUCK OFF BLUD") #SHOULD NEVER BE SHOWN TO USER
+                # SHOULD NEVER BE SHOWN TO USER
+                self.BOT.send_message(message.from_user.id, "The video size exceeds 50MB limit, please FUCK OFF BLUD") 
                 print(str(e))
-                os.remove(yt.compressed_video_name) #ЕЕсли не отправился тоже удаляю
+                # Если не отправился тоже удаляю
+                os.remove(self.YT.compressed_video_name) 
                 enjoy = False #Если не отправился, пишу об этом пользователю и не вывожу что все хорошо
-            os.remove(yt.getpath() + '/' + yt.get_filename())#В любом случае удаляю основной видос
+            os.remove(self.YT.getpath() + '/' + self.YT.get_filename())#В любом случае удаляю основной видос
             if enjoy: #Все хорошо - пишу пользователю
-                bot.send_message(message.from_user.id, "Enjoy!")
+                self.BOT.send_message(message.from_user.id, "Enjoy!")
             
         else: #Если видео маленькое
-            f = open(yt.getpath() + '/' + yt.get_filename() ,"rb")
+            f = open(self.YT.getpath() + '/' + self.YT.get_filename() ,"rb")
             print("ok - small")
             try:
-                bot.send_document(message.chat.id,f, timeout=200)
-                os.remove(yt.getpath() + '/' + yt.get_filename())
-                bot.send_message(message.from_user.id, "Enjoy!!")
+                self.BOT.send_document(message.chat.id,f, timeout=200)
+                os.remove(self.YT.getpath() + '/' + self.YT.get_filename())
+                self.BOT.send_message(message.from_user.id, "Enjoy!!")
             except Exception as e:
-                bot.send_message(message.from_user.id, "The video size exceeds 50MB limit, please FUCK OFF BLUD") #SHOULD NEVER BE SHOWN TO USER
+                self.BOT.send_message(message.from_user.id, "The video size exceeds 50MB limit, please FUCK OFF BLUD") #SHOULD NEVER BE SHOWN TO USER
                 print(str(e))
-                os.remove(yt.getpath() + '/' + yt.get_filename())
+                os.remove(self.YT.getpath() + '/' + self.YT.get_filename())
 
-    def sendIg(message):
+    def sendIg(self, message):
         print('SUKA')
         try:
-            download_link = ig.get_download_linkIG()
+            download_link = self.IG.get_download_linkIG()
             print("goot")
-            bot.send_message(message.from_user.id, "Your instagram download link is ready: ")
-            bot.send_message(message.from_user.id, download_link)
-            bot.send_message(message.from_user.id, "Enjoy!!")
+            self.BOT.send_message(message.from_user.id, "Your instagram download link is ready: ")
+            self.BOT.send_message(message.from_user.id, download_link)
+            self.BOT.send_message(message.from_user.id, "Enjoy!!")
         except Exception as e:
             print(e)
-            bot.send_message(message.from_user.id, "Something went wrong! There might be exceeded limit for free triel of instadownloader api sorry im poor")
+            self.BOT.send_message(message.from_user.id, "Something went wrong! There might be exceeded limit for free triel of instadownloader api sorry im poor")
 
-    bot.infinity_polling(timeout=10, long_polling_timeout = 50) #Зацикленное получение сообщений от пользователя
+    # Зацикленное получение сообщений от пользователя 
 
 if __name__ == '__main__':
-    program()
+    dl = DownloadBot()
