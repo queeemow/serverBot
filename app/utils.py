@@ -39,10 +39,10 @@ class DLYouTube:
 
     def __init__(self, url) -> None: # При создании объекта, передается введенная в чат пользователем ссылка на видео в качестве url
         try: #Создаю папку если ее нет во внешней директории с именем видеос
-            os.mkdir('./data/videos') 
+            os.mkdir('./data') 
         except:
             pass
-        self.path = os.path.abspath('./data/videos')
+        self.path = os.path.abspath('./data')
         self.url = url
         self.vid = YouTube(self.url)
         self.file_name = fr'{self.vid.title.split()[0]}_{self.vid_resolution}.mp4' #Имя файла - первое слово из заголовка(тайтл)_разрешение видео_.мп4
@@ -72,45 +72,39 @@ class DLYouTube:
     def is_big_filesize(self):#Проверка является ли файл большим(превышает ли лимит телеграма и надо ли его делить на маленькие)
         return self.vid.streams.get_by_resolution(self.vid_resolution).filesize > self.MAX_FILESIZE 
 
-    
+    # def compress_video(self):
+    #     self.compressed_video_name = self.path+'/'+self.file_name[:-4] + '_COMPRESSED' + '.mp4'
+    #     # Reference: https://en.wikipedia.org/wiki/Bit_rate#Encoding_bit_rate
+    #     min_audio_bitrate = 32000
+    #     max_audio_bitrate = 256000
+    #     print("compressing....")
+    #     probe = ffmpeg.probe(self.path+'/'+self.file_name)
+    #     # Video duration, in s.
+    #     duration = float(probe['format']['duration'])
+    #     print(duration)
+    #     # Audio bitrate, in bps.
+    #     audio_bitrate = float(next((s for s in probe['streams'] if s['codec_type'] == 'audio'), None)['bit_rate'])
+    #     # Target total bitrate, in bps.
+    #     target_total_bitrate = (self.MAX_FILESIZE * 8) / (1.073741824 * duration)
 
-    def download_audio_only(self):
+    #     # Target audio bitrate, in bps
+    #     if 10 * audio_bitrate > target_total_bitrate:
+    #         audio_bitrate = target_total_bitrate / 10
+    #         if audio_bitrate < min_audio_bitrate < target_total_bitrate:
+    #             audio_bitrate = min_audio_bitrate
+    #         elif audio_bitrate > max_audio_bitrate:
+    #             audio_bitrate = max_audio_bitrate
+    #     # Target video bitrate, in bps.
+    #     video_bitrate = target_total_bitrate - audio_bitrate
 
-        pass
-
-    def compress_video(self):
-        self.compressed_video_name = self.path+'/'+self.file_name[:-4] + '_COMPRESSED' + '.mp4'
-        # Reference: https://en.wikipedia.org/wiki/Bit_rate#Encoding_bit_rate
-        min_audio_bitrate = 32000
-        max_audio_bitrate = 256000
-        print("compressing....")
-        probe = ffmpeg.probe(self.path+'/'+self.file_name)
-        # Video duration, in s.
-        duration = float(probe['format']['duration'])
-        print(duration)
-        # Audio bitrate, in bps.
-        audio_bitrate = float(next((s for s in probe['streams'] if s['codec_type'] == 'audio'), None)['bit_rate'])
-        # Target total bitrate, in bps.
-        target_total_bitrate = (self.MAX_FILESIZE * 8) / (1.073741824 * duration)
-
-        # Target audio bitrate, in bps
-        if 10 * audio_bitrate > target_total_bitrate:
-            audio_bitrate = target_total_bitrate / 10
-            if audio_bitrate < min_audio_bitrate < target_total_bitrate:
-                audio_bitrate = min_audio_bitrate
-            elif audio_bitrate > max_audio_bitrate:
-                audio_bitrate = max_audio_bitrate
-        # Target video bitrate, in bps.
-        video_bitrate = target_total_bitrate - audio_bitrate
-
-        i = ffmpeg.input(self.path+'/'+self.file_name)
-        ffmpeg.output(i, os.devnull, passlogfile = './data/videos/ffmpeg2pass',
-                    **{'c:v': 'libx264', 'b:v': video_bitrate, 'pass': 1, 'f': 'mp4'}
-                    ).overwrite_output().run()
+    #     i = ffmpeg.input(self.path+'/'+self.file_name)
+    #     ffmpeg.output(i, os.devnull, passlogfile = './data/videos/ffmpeg2pass',
+    #                 **{'c:v': 'libx264', 'b:v': video_bitrate, 'pass': 1, 'f': 'mp4'}
+    #                 ).overwrite_output().run()
         
-        ffmpeg.output(i, self.compressed_video_name, passlogfile = './data/videos/ffmpeg2pass',
-                    **{'c:v': 'libx264', 'b:v': video_bitrate, 'pass': 2, 'c:a': 'aac', 'b:a': audio_bitrate}
-                    ).overwrite_output().run()
+    #     ffmpeg.output(i, self.compressed_video_name, passlogfile = './data/videos/ffmpeg2pass',
+    #                 **{'c:v': 'libx264', 'b:v': video_bitrate, 'pass': 2, 'c:a': 'aac', 'b:a': audio_bitrate}
+    #                 ).overwrite_output().run()
     # def get_divide_into_count(self):
     #     return self.divide_into_count
 
@@ -136,13 +130,26 @@ class DLYouTube:
     #     self.current_video.sort() #Сортирую в порядке возрастания, чтобы в мейне в цикле их в правильном порядке отослать пользователю
     #     pass
 
+    def download_audio_only(self):
+        self.file_name = fr'{self.vid.title.split()[0]}.mp3'
+        print('download method start')
+        print(self.vid.streams.filter(only_audio=True))
+        self.path = self.path + '/audios'
+        self.vid.streams.get_by_resolution(self.vid_resolution).download(self.path, self.file_name)
+        print('download method end')
+        pass
+
     def download_video(self): #Скачать видос на компьютр(на сервер) 
         print('download method start')
         self.file_name = fr'{self.vid.title.split()[0]}_{self.vid_resolution}.mp4'
         print("filename = ", self.file_name)
+        self.path = self.path + '/videos'
         self.vid.streams.get_by_resolution(self.vid_resolution).download(self.path, self.file_name)
         print("Download method end")
         pass
+
+# dl = DLYouTube('https://youtu.be/b8PXOeXSgOI?si=Dm3Jr_iIgTNiq62E')
+# dl.download_audio_only()
 
 class DLIGReels: #Допиливаю класс для скачки рилзов из инсты - Подключается по апи, работает недолго
     querystring = None
