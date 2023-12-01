@@ -72,6 +72,12 @@ class DLYouTube:
     def is_big_filesize(self):#Проверка является ли файл большим(превышает ли лимит телеграма и надо ли его делить на маленькие)
         return self.vid.streams.get_by_resolution(self.vid_resolution).filesize > self.MAX_FILESIZE 
 
+    
+
+    def download_audio_only(self):
+
+        pass
+
     def compress_video(self):
         self.compressed_video_name = self.path+'/'+self.file_name[:-4] + '_COMPRESSED' + '.mp4'
         # Reference: https://en.wikipedia.org/wiki/Bit_rate#Encoding_bit_rate
@@ -130,7 +136,7 @@ class DLYouTube:
     #     self.current_video.sort() #Сортирую в порядке возрастания, чтобы в мейне в цикле их в правильном порядке отослать пользователю
     #     pass
 
-    def download(self): #Скачать видос на компьютр(на сервер) 
+    def download_video(self): #Скачать видос на компьютр(на сервер) 
         print('download method start')
         self.file_name = fr'{self.vid.title.split()[0]}_{self.vid_resolution}.mp4'
         print("filename = ", self.file_name)
