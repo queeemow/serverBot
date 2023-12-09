@@ -1,20 +1,28 @@
 import os
 import telebot
-from config import BOT_TOKEN
+from config import BOT_TOKEN, api_hash, api_id, clients, sending_queue
 import config
-from utils import Convert, DLYouTube, DLIGReels
+from utils import Convert, DLYouTube, DLIGReels, DataBase
 from telebot import types
+from pyrogram import Client
+import asyncio
+import datetime
+
 
 class DownloadBot:
     bot = None
-    YT = None
-    IG = None
+    YT = {}
+    IG = {}
     ENJOY = None
     WHICH_LINK = None
     CON = None
     VID_OR_AUD_MARKUP = None
     RES_MARKUP = None
     message = None
+    sending_queue = []
+    db = None
+    user_data = {}
+
 
     def __init__(self) -> None:
         print('test')
@@ -23,7 +31,7 @@ class DownloadBot:
         @self.bot.message_handler(content_types=["text"])
         def get_text_message_handler(message):
             return self.get_text_messages(message)
-        
+
     def get_text_messages(self, message): 
         print("message = ", message.text)
 
@@ -35,11 +43,15 @@ class DownloadBot:
                 video = types.KeyboardButton('video')
                 audio = types.KeyboardButton('audio')
                 self.VID_OR_AUD_MARKUP.add(video, audio)
-                self.YT = DLYouTube(str(message.text))
+                self.YT[message.chat.id] = DLYouTube(str(message.text))
+                self.user_data[message.chat.id] = {}
+                self.user_data[message.chat.id]['date_time_of_request'] = '{}'.format(datetime.datetime.now())
+                self.user_data[message.chat.id]['chat_id'] = str(message.chat.id)
+                self.user_data[message.chat.id]['request_url'] = str(message.text)
                 self.bot.send_message(message.chat.id, text="Would you like to get video or audio only?".format(message.from_user), reply_markup=self.VID_OR_AUD_MARKUP)
                 self.bot.register_next_step_handler(message, self.is_video_or_audio)
             case 2:
-                self.IG = DLIGReels(str(message.text))
+                self.IG[message.chat.id] = DLIGReels(str(message.text))
                 self.bot.send_message(message.from_user.id, 'Getting download link, Please stand by...')
                 self.sendIg(message)
             case 0: 
@@ -49,6 +61,7 @@ class DownloadBot:
         print("DEFINING AUDIO OR VIDEO")
         match message.text:
             case 'video':
+                self.user_data[message.chat.id]['video_or_audio'] = 'video'
                 print("SENT VIDEO")
                 self.RES_MARKUP = types.ReplyKeyboardMarkup(resize_keyboard=True)
                 # res240 = types.KeyboardButton("240p")
@@ -59,6 +72,7 @@ class DownloadBot:
                 self.bot.send_message(message.chat.id, text="Choose a resolution via menu".format(message.from_user), reply_markup=self.RES_MARKUP)
                 self.bot.register_next_step_handler(message, self.choose_YT_resolution)
             case 'audio':
+                self.user_data[message.chat.id]['video_or_audio'] = 'audio'
                 print("SENT AUDIO")
                 self.download_audio(message)
             case _:
@@ -69,25 +83,35 @@ class DownloadBot:
 
     def download_audio(self, message):
         print("DL AUDIO")
-        try:
+        is_big = self.YT[message.chat.id].is_big_audio_file_size()
+        self.user_data[message.chat.id]['file_size'] = str(self.YT[message.chat.id].audio_file_size())
+        if is_big:
+            print("YES THE FILE IS BIG, IT WEIGHTS  ", self.YT[message.chat.id].is_big_audio_file_size())
             self.bot.send_message(message.from_user.id, "Downloading, Please stand by...")
-            self.YT.download_audio_only()
-            self.sendYT(message)
-        except Exception as e:
-            self.bot.send_message(message.from_user.id, "Something went wrong! Try again with the correct download options")
-            self.get_text_messages(message)
-            print(str(e))
-        pass
+            self.YT[message.chat.id].download_audio_only()
+            self.sendYT(message, True)
+        else:
+            try:
+                self.bot.send_message(message.from_user.id, "Downloading, Please stand by...")
+                self.YT[message.chat.id].download_audio_only()
+                self.sendYT(message, False)
+            except Exception as e:
+                self.bot.send_message(message.from_user.id, "Something went wrong! Try again with the correct download options")
+                self.get_text_messages(message)
+                print(str(e))
+            pass
 
     def downloadYT(self, message): 
+        self.user_data[message.chat.id]['file_size'] = str(self.YT[message.chat.id].video_file_size())
         try:
-            self.YT.set_res(message.text) 
-            if self.YT.is_big_filesize():  
-                self.bot.send_message(message.from_user.id, f'The video weights more than 50MB, which is maximum allowed document size limit')
-                self.get_text_messages(message)
+            self.YT[message.chat.id].set_res(message.text) 
+            if self.YT[message.chat.id].is_big_filesize():  
+                self.bot.send_message(message.from_user.id, "Downloading, Please stand by...") 
+                self.YT[message.chat.id].download_video()
+                self.sendYT(message, is_big=True)
             else:
                 self.bot.send_message(message.from_user.id, "Downloading, Please stand by...") 
-                self.YT.download_video()
+                self.YT[message.chat.id].download_video()
                 self.sendYT(message)
         except Exception as e:
             self.bot.send_message(message.from_user.id, "Something went wrong! Try again with the correct download options")
@@ -97,31 +121,53 @@ class DownloadBot:
     def sendYT(self, message, is_big = False): 
         print("SENDING!!!!")
         if is_big:
-            print("______SEND BIG VIDEO_______", self.YT.compressed_video_name)
-            print("current video =    ", self.YT.compressed_video_name)
-            self.bot.send_message(message.from_user.id, "The video size exceeds 50MB limit, please FUCK OFF BLUD")
+            sending_queue.append(message.chat.id)
+            print('\n\nSESSION NUMBER = ', len(sending_queue), "\n\n")
+            try:
+                self.user_data[message.chat.id]['status'] = 'done'
+                if self.YT[message.chat.id].get_filename()[-1] == '4':
+                    file_id = asyncio.run(self.send_large_video(message, i=len(sending_queue))).video.file_id
+                    self.bot.send_video(message.chat.id, video = file_id)
+                    self.bot.send_message(message.from_user.id, "Enjoy!!")
+                    os.remove(self.YT[message.chat.id].getpath() + '/' + self.YT[message.chat.id].get_filename())
+                    sending_queue.pop()
+                else:
+                    file_id = asyncio.run(self.send_large_audio(message, i=len(sending_queue))).audio.file_id
+                    self.bot.send_audio(message.chat.id, audio = file_id)
+                    self.bot.send_message(message.from_user.id, "Enjoy!!")
+                    os.remove(self.YT[message.chat.id].getpath() + '/' + self.YT[message.chat.id].get_filename())
+                    sending_queue.pop()
+            except Exception as e:
+                print(e)
+                self.bot.send_message(message.from_user.id, "The file weights more than 1,5GB!!!!!!!!!!!!!")
+                self.get_text_messages(message)
+                self.user_data[message.chat.id]['status'] = 'error'
         else: 
-            print("preok - small   ", self.YT.getpath(), "    ", self.YT.get_filename())
-            f = open(self.YT.getpath() + '/' + self.YT.get_filename() ,"rb")
+            print("preok - small   ", self.YT[message.chat.id].getpath(), "    ", self.YT[message.chat.id].get_filename())
+            f = open(self.YT[message.chat.id].getpath() + '/' + self.YT[message.chat.id].get_filename() ,"rb")
             print("ok - small")
             try:
-                if self.YT.get_filename()[-1] == '4':
+                self.user_data[message.chat.id]['status'] = 'done'
+                if self.YT[message.chat.id].get_filename()[-1] == '4':
                     self.bot.send_video(message.chat.id,f, timeout=200)
-                    os.remove(self.YT.getpath() + '/' + self.YT.get_filename())
+                    os.remove(self.YT[message.chat.id].getpath() + '/' + self.YT[message.chat.id].get_filename())
                     self.bot.send_message(message.from_user.id, "Enjoy!!")
                 else:
                     self.bot.send_audio(message.chat.id,f, timeout=200)
-                    os.remove(self.YT.getpath() + '/' + self.YT.get_filename())
+                    os.remove(self.YT[message.chat.id].getpath() + '/' + self.YT[message.chat.id].get_filename())
                     self.bot.send_message(message.from_user.id, "Enjoy!!")
             except Exception as e:
-                self.bot.send_message(message.from_user.id, "The video size exceeds 50MB limit, please FUCK OFF BLUD") 
+                self.bot.send_message(message.from_user.id, "Something went wrong!") 
                 print(str(e))
-                os.remove(self.YT.getpath() + '/' + self.YT.get_filename())
+                os.remove(self.YT[message.chat.id].getpath() + '/' + self.YT[message.chat.id].get_filename())
+                self.user_data[message.chat.id]['status'] = 'error'
+                self.get_text_messages(message)
+        self.add_user_data(message)
 
     def sendIg(self, message):
         print('SUKA')
         try:
-            download_link = self.IG.get_download_linkIG()
+            download_link = self.IG[message.chat.id].get_download_linkIG()
             print("goot")
             self.bot.send_message(message.from_user.id, "Your instagram download link is ready: ")
             self.bot.send_message(message.from_user.id, download_link)
@@ -130,8 +176,28 @@ class DownloadBot:
             print(e)
             self.bot.send_message(message.from_user.id, "Something went wrong! There might be exceeded limit for free triel of instadownloader api sorry im poor")
 
+    async def send_large_video(self, message, i):
+        async with Client(clients[i], api_id=api_id, api_hash=api_hash) as app:
+            return await app.send_video("@NMFY_BOT", self.YT[message.chat.id].getpath() + '/' + self.YT[message.chat.id].get_filename())
+    
+    async def send_large_audio(self, message, i):
+        async with Client(clients[i], api_id=api_id, api_hash=api_hash) as app:
+            return await app.send_audio("@NMFY_BOT", self.YT[message.chat.id].getpath() + '/' + self.YT[message.chat.id].get_filename())
+    
+    def add_user_data(self, message):
+        self.db = DataBase()
+        print("\n\n\n", self.user_data, "\n\n\n")
+        self.db.add_userdata(date_time_of_request = self.user_data[message.chat.id]['date_time_of_request'], 
+                             chat_id = self.user_data[message.chat.id]['chat_id'], 
+                             request_url = self.user_data[message.chat.id]['request_url'], 
+                             video_or_audio = self.user_data[message.chat.id]['video_or_audio'], 
+                             file_size = self.user_data[message.chat.id]['file_size'], 
+                             status = self.user_data[message.chat.id]['status'], 
+                             time_spent = '---')
+        self.db.close_conection()
+
     def start_pooling(self):
-        self.bot.infinity_polling(timeout=10, long_polling_timeout = 50)
+        self.bot.infinity_polling(timeout=10, long_polling_timeout = 50)   
 
 if __name__ == '__main__':
     dl = DownloadBot()

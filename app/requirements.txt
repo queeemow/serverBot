@@ -15,4 +15,6 @@ wcwidth==0.2.8
 wrapt==1.15.0
 yarl==1.9.2
 youtube-dl==2021.12.17
+TgCrypto==1.2.5
+Pyrogram==2.0.106
 -e git+https://github.com/queeemow/pytube_without_age_error.git#egg=pytube
