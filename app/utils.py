@@ -128,9 +128,7 @@ class DataBase:
 
     def __init__(self) -> None:
         try:
-            self.connection = psycopg2.connect(dbname='nmfy', user='postgres', 
-                            password='1405', host='localhost')
-            self.cursor = self.connection.cursor()
+            self.connect()
             print('all good')
             print("Информация о сервере PostgreSQL")
             print(self.connection.get_dsn_parameters(), "\n")
@@ -140,6 +138,7 @@ class DataBase:
         pass
     
     def create_table(self):
+        print("create table")
         try:
             create_table_query = '''CREATE TABLE userdata
                             (date_time_of_request TIMESTAMP, 
@@ -154,7 +153,6 @@ class DataBase:
             self.connection.commit()
         except:
             print("The table is probably already created!")
-        pass
 
     def add_userdata(self, date_time_of_request, chat_id, request_url, video_or_audio, file_size, status, time_spent):
         try:
@@ -180,7 +178,19 @@ class DataBase:
             print("User успешно добавлен в таблицу!")
         except Exception as e:
             print(e)
+
     
+    def connect(self):
+        if not self.connection:
+            self.connection = psycopg2.connect(dbname='nmfy', user='postgres', 
+                                password='1405', host='localhost')
+            self.cursor = self.connection.cursor()
+            print('all good')
+            print("Информация о сервере PostgreSQL")
+            print(self.connection.get_dsn_parameters(), "\n")
+        else:
+            print("Already connected")
+
     def select_all(self):
         try:
             select_all_qeury = "SELECT * FROM userdata;"
@@ -188,6 +198,7 @@ class DataBase:
             self.connection.commit()
         except Exception as e:
             print(e)
+        self.close_conection()
 
     def close_conection(self):
         if self.connection:
@@ -202,3 +213,5 @@ class DataBase:
             self.connection.commit()
         except Exception as e:
             print(e)
+
+"ДАТАБЕЙС И ТАБЛИЦА ПРЕДВАРИТЕЛЬНО БЫЛИ СОЗДАНЫ!"

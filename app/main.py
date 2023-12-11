@@ -48,6 +48,7 @@ class DownloadBot:
                 self.user_data[message.chat.id]['date_time_of_request'] = '{}'.format(datetime.datetime.now())
                 self.user_data[message.chat.id]['chat_id'] = str(message.chat.id)
                 self.user_data[message.chat.id]['request_url'] = str(message.text)
+                self.user_data[message.chat.id]['time_spent'] = datetime.datetime.now()
                 self.bot.send_message(message.chat.id, text="Would you like to get video or audio only?".format(message.from_user), reply_markup=self.VID_OR_AUD_MARKUP)
                 self.bot.register_next_step_handler(message, self.is_video_or_audio)
             case 2:
@@ -145,6 +146,7 @@ class DownloadBot:
         else: 
             print("preok - small   ", self.YT[message.chat.id].getpath(), "    ", self.YT[message.chat.id].get_filename())
             f = open(self.YT[message.chat.id].getpath() + '/' + self.YT[message.chat.id].get_filename() ,"rb")
+            print(self.YT[message.chat.id].getpath() + '/' + self.YT[message.chat.id].get_filename(), "<-------small filename")
             print("ok - small")
             try:
                 self.user_data[message.chat.id]['status'] = 'done'
@@ -153,15 +155,20 @@ class DownloadBot:
                     os.remove(self.YT[message.chat.id].getpath() + '/' + self.YT[message.chat.id].get_filename())
                     self.bot.send_message(message.from_user.id, "Enjoy!!")
                 else:
-                    self.bot.send_audio(message.chat.id,f, timeout=200)
-                    os.remove(self.YT[message.chat.id].getpath() + '/' + self.YT[message.chat.id].get_filename())
+                    print("START OF SMALL AUDIO SENDNG")
+                    sending_queue.append(message.chat.id)
+                    file_id = asyncio.run(self.send_large_audio(message, i=len(sending_queue))).audio.file_id
+                    self.bot.send_audio(message.chat.id, audio = file_id)
                     self.bot.send_message(message.from_user.id, "Enjoy!!")
+                    os.remove(self.YT[message.chat.id].getpath() + '/' + self.YT[message.chat.id].get_filename())
+                    sending_queue.pop()
             except Exception as e:
                 self.bot.send_message(message.from_user.id, "Something went wrong!") 
                 print(str(e))
                 os.remove(self.YT[message.chat.id].getpath() + '/' + self.YT[message.chat.id].get_filename())
                 self.user_data[message.chat.id]['status'] = 'error'
                 self.get_text_messages(message)
+        self.user_data[message.chat.id]['time_spent'] = (datetime.datetime.now() - self.user_data[message.chat.id]['time_spent']).total_seconds()
         self.add_user_data(message)
 
     def sendIg(self, message):
@@ -193,7 +200,7 @@ class DownloadBot:
                              video_or_audio = self.user_data[message.chat.id]['video_or_audio'], 
                              file_size = self.user_data[message.chat.id]['file_size'], 
                              status = self.user_data[message.chat.id]['status'], 
-                             time_spent = '---')
+                             time_spent = self.user_data[message.chat.id]['time_spent'])
         self.db.close_conection()
 
     def start_pooling(self):
