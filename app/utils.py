@@ -4,7 +4,6 @@ import requests
 from pytube import YouTube
 import requests
 import psycopg2
-import datetime
 
 class Convert: #Проверка ссылки - ЮТЮБ ИНСТА
 
@@ -132,7 +131,7 @@ class DataBase:
             print('all good')
             print("Информация о сервере PostgreSQL")
             print(self.connection.get_dsn_parameters(), "\n")
-            # self.create_table()
+            self.create_table()
         except Exception as e:
             print(e)
         pass
@@ -140,7 +139,7 @@ class DataBase:
     def create_table(self):
         print("create table")
         try:
-            create_table_query = '''CREATE TABLE userdata
+            create_table_query = '''CREATE TABLE IF NOT EXISTS userdata
                             (date_time_of_request TIMESTAMP, 
                             chat_id VARCHAR, 
                             request_url VARCHAR,
@@ -181,15 +180,15 @@ class DataBase:
 
     
     def connect(self):
-        if not self.connection:
+        try:
             self.connection = psycopg2.connect(dbname='nmfy', user='postgres', 
                                 password='1405', host='localhost')
             self.cursor = self.connection.cursor()
             print('all good')
             print("Информация о сервере PostgreSQL")
             print(self.connection.get_dsn_parameters(), "\n")
-        else:
-            print("Already connected")
+        except Exception as e:
+            print(e)
 
     def select_all(self):
         try:
@@ -213,5 +212,3 @@ class DataBase:
             self.connection.commit()
         except Exception as e:
             print(e)
-
-"ДАТАБЕЙС И ТАБЛИЦА ПРЕДВАРИТЕЛЬНО БЫЛИ СОЗДАНЫ!"

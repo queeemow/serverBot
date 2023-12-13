@@ -1,15 +1,11 @@
-FROM python:3-onbuild
+# Базовый образ для Python
+FROM python:3.11
 
-RUN apt-get update && apt-get install -y \
-    python3-pip \
-    python3-venv \
-    python3-dev \
-    python3-setuptools \
-    python3-wheel
+WORKDIR /app
 
-COPY requirements.txt .
+COPY ./requirements.txt /app/requirements.txt
 RUN pip install -r requirements.txt
 
-COPY . .
+COPY . /app
 
-CMD ["python", "main.py"]
+CMD [“python”, “main.py”]

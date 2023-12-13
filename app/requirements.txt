@@ -17,4 +17,8 @@ yarl==1.9.2
 youtube-dl==2021.12.17
 TgCrypto==1.2.5
 Pyrogram==2.0.106
+Telethon==1.32.1
+TgCrypto==1.2.5
+psycopg2-binary==2.9.9
+python-dotenv==1.0.0
 -e git+https://github.com/queeemow/pytube_without_age_error.git#egg=pytube

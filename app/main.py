@@ -1,13 +1,20 @@
 import os
 import telebot
-from config import BOT_TOKEN, api_hash, api_id, clients, sending_queue
-import config
 from utils import Convert, DLYouTube, DLIGReels, DataBase
 from telebot import types
 from pyrogram import Client
+from config import CLIENTS, SENDING_QUEUE
 import asyncio
 import datetime
+from dotenv.main import load_dotenv
+load_dotenv()
 
+BOT_TOKEN = os.environ['BOT_TOKEN']
+API_ID = os.environ['API_ID']
+API_HASH = os.environ['API_HASH']
+
+print(type(CLIENTS))
+print(BOT_TOKEN)
 
 class DownloadBot:
     bot = None
@@ -19,7 +26,6 @@ class DownloadBot:
     VID_OR_AUD_MARKUP = None
     RES_MARKUP = None
     message = None
-    sending_queue = []
     db = None
     user_data = {}
 
@@ -122,22 +128,22 @@ class DownloadBot:
     def sendYT(self, message, is_big = False): 
         print("SENDING!!!!")
         if is_big:
-            sending_queue.append(message.chat.id)
-            print('\n\nSESSION NUMBER = ', len(sending_queue), "\n\n")
+            SENDING_QUEUE.append(message.chat.id)
+            print('\n\nSESSION NUMBER = ', len(SENDING_QUEUE), "\n\n")
             try:
                 self.user_data[message.chat.id]['status'] = 'done'
                 if self.YT[message.chat.id].get_filename()[-1] == '4':
-                    file_id = asyncio.run(self.send_large_video(message, i=len(sending_queue))).video.file_id
+                    file_id = asyncio.run(self.send_large_video(message, i=len(SENDING_QUEUE))).video.file_id
                     self.bot.send_video(message.chat.id, video = file_id)
                     self.bot.send_message(message.from_user.id, "Enjoy!!")
                     os.remove(self.YT[message.chat.id].getpath() + '/' + self.YT[message.chat.id].get_filename())
-                    sending_queue.pop()
+                    SENDING_QUEUE.pop()
                 else:
-                    file_id = asyncio.run(self.send_large_audio(message, i=len(sending_queue))).audio.file_id
+                    file_id = asyncio.run(self.send_large_audio(message, i=len(SENDING_QUEUE))).audio.file_id
                     self.bot.send_audio(message.chat.id, audio = file_id)
                     self.bot.send_message(message.from_user.id, "Enjoy!!")
                     os.remove(self.YT[message.chat.id].getpath() + '/' + self.YT[message.chat.id].get_filename())
-                    sending_queue.pop()
+                    SENDING_QUEUE.pop()
             except Exception as e:
                 print(e)
                 self.bot.send_message(message.from_user.id, "The file weights more than 1,5GB!!!!!!!!!!!!!")
@@ -156,12 +162,12 @@ class DownloadBot:
                     self.bot.send_message(message.from_user.id, "Enjoy!!")
                 else:
                     print("START OF SMALL AUDIO SENDNG")
-                    sending_queue.append(message.chat.id)
-                    file_id = asyncio.run(self.send_large_audio(message, i=len(sending_queue))).audio.file_id
+                    SENDING_QUEUE.append(message.chat.id)
+                    file_id = asyncio.run(self.send_large_audio(message, i=len(SENDING_QUEUE))).audio.file_id
                     self.bot.send_audio(message.chat.id, audio = file_id)
                     self.bot.send_message(message.from_user.id, "Enjoy!!")
                     os.remove(self.YT[message.chat.id].getpath() + '/' + self.YT[message.chat.id].get_filename())
-                    sending_queue.pop()
+                    SENDING_QUEUE.pop()
             except Exception as e:
                 self.bot.send_message(message.from_user.id, "Something went wrong!") 
                 print(str(e))
@@ -184,11 +190,11 @@ class DownloadBot:
             self.bot.send_message(message.from_user.id, "Something went wrong! There might be exceeded limit for free triel of instadownloader api sorry im poor")
 
     async def send_large_video(self, message, i):
-        async with Client(clients[i], api_id=api_id, api_hash=api_hash) as app:
+        async with Client(CLIENTS[i], api_id=API_ID, api_hash=API_HASH) as app:
             return await app.send_video("@NMFY_BOT", self.YT[message.chat.id].getpath() + '/' + self.YT[message.chat.id].get_filename())
     
     async def send_large_audio(self, message, i):
-        async with Client(clients[i], api_id=api_id, api_hash=api_hash) as app:
+        async with Client(CLIENTS[i], api_id=API_ID, api_hash=API_HASH) as app:
             return await app.send_audio("@NMFY_BOT", self.YT[message.chat.id].getpath() + '/' + self.YT[message.chat.id].get_filename())
     
     def add_user_data(self, message):
